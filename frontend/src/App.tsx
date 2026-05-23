@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Input, Select, Table, Text, Title } from 'rizzui';
+import { Alert, Badge, Box, Button, Input, Select, Table, Text, Title } from 'rizzui';
 import { RotateCw } from 'lucide-react';
 import {
   Bar,
@@ -47,6 +47,19 @@ const badgeColors: Record<string, 'success' | 'warning' | 'danger' | 'secondary'
   stale: 'danger',
   never_seen: 'warning',
 };
+const statusOptions = [
+  { label: 'All status', value: 'all' },
+  { label: 'Idle', value: 'idle' },
+  { label: 'Moving', value: 'moving' },
+  { label: 'Charging', value: 'charging' },
+  { label: 'Fault', value: 'fault' },
+];
+const freshnessOptions = [
+  { label: 'All freshness', value: 'all' },
+  { label: 'Fresh', value: 'fresh' },
+  { label: 'Stale', value: 'stale' },
+  { label: 'Never seen', value: 'never_seen' },
+];
 
 function fmtTime(value: string | null): string {
   if (!value) return 'Never';
@@ -59,7 +72,14 @@ function fmtTime(value: string | null): string {
 
 function humanize(value: string | null | undefined): string {
   if (!value) return '-';
-  return value.replaceAll('_', ' ');
+  return value.replace(/_/g, ' ');
+}
+
+function selectValue(value: unknown): string {
+  if (value && typeof value === 'object' && 'value' in value) {
+    return String((value as { value: string | number }).value);
+  }
+  return 'all';
 }
 
 function MetricCard({
@@ -72,12 +92,12 @@ function MetricCard({
   tone?: 'neutral' | 'teal' | 'rose' | 'amber' | 'indigo';
 }) {
   return (
-    <Card className={`metric-card tone-${tone ?? 'neutral'}`}>
+    <Box className={`metric-card tone-${tone ?? 'neutral'}`}>
       <Text className="metric-label">{label}</Text>
       <Title as="h3" className="metric-value">
         {value}
       </Title>
-    </Card>
+    </Box>
   );
 }
 
@@ -180,7 +200,7 @@ function App() {
       </section>
 
       <section className="chart-grid">
-        <Card className="panel">
+        <Box className="panel">
           <Title as="h2" className="panel-title">
             Fleet Status
           </Title>
@@ -195,9 +215,9 @@ function App() {
               <Legend />
             </PieChart>
           </ResponsiveContainer>
-        </Card>
+        </Box>
 
-        <Card className="panel">
+        <Box className="panel">
           <Title as="h2" className="panel-title">
             Zone Entries
           </Title>
@@ -210,9 +230,9 @@ function App() {
               <Bar dataKey="entry_count" fill="#0f766e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </Card>
+        </Box>
 
-        <Card className="panel">
+        <Box className="panel">
           <Title as="h2" className="panel-title">
             Anomalies
           </Title>
@@ -225,9 +245,9 @@ function App() {
               <Bar dataKey="value" fill="#be123c" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </Card>
+        </Box>
 
-        <Card className="panel">
+        <Box className="panel">
           <Title as="h2" className="panel-title">
             Freshness
           </Title>
@@ -242,10 +262,10 @@ function App() {
               <Legend />
             </PieChart>
           </ResponsiveContainer>
-        </Card>
+        </Box>
       </section>
 
-      <Card className="panel vehicle-panel">
+      <Box className="panel vehicle-panel">
         <div className="vehicle-panel-head">
           <div>
             <Title as="h2" className="panel-title">
@@ -256,25 +276,14 @@ function App() {
           <div className="filters">
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search vehicles" />
             <Select
-              value={statusFilter}
-              onChange={(option: { value: string } | null) => setStatusFilter(option?.value ?? 'all')}
-              options={[
-                { label: 'All status', value: 'all' },
-                { label: 'Idle', value: 'idle' },
-                { label: 'Moving', value: 'moving' },
-                { label: 'Charging', value: 'charging' },
-                { label: 'Fault', value: 'fault' },
-              ]}
+              value={statusOptions.find((option) => option.value === statusFilter)}
+              onChange={(option: unknown) => setStatusFilter(selectValue(option))}
+              options={statusOptions}
             />
             <Select
-              value={freshnessFilter}
-              onChange={(option: { value: string } | null) => setFreshnessFilter(option?.value ?? 'all')}
-              options={[
-                { label: 'All freshness', value: 'all' },
-                { label: 'Fresh', value: 'fresh' },
-                { label: 'Stale', value: 'stale' },
-                { label: 'Never seen', value: 'never_seen' },
-              ]}
+              value={freshnessOptions.find((option) => option.value === freshnessFilter)}
+              onChange={(option: unknown) => setFreshnessFilter(selectValue(option))}
+              options={freshnessOptions}
             />
           </div>
         </div>
@@ -313,7 +322,7 @@ function App() {
             </Table.Body>
           </Table>
         </div>
-      </Card>
+      </Box>
     </main>
   );
 }

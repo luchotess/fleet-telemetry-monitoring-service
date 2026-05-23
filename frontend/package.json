@@ -9,13 +9,15 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.19",
+    "@headlessui/react": "^2.2.10",
     "@vitejs/plugin-react": "^4.3.1",
     "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "recharts": "^2.12.7",
     "rizzui": "^0.8.7",
-    "vite": "^5.3.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "vite": "^5.3.3"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
