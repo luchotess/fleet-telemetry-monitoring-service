@@ -119,6 +119,8 @@ The suite covers token creation, token mismatch rejection, telemetry validation,
 
 ## API Examples
 
+The repository includes [request.http](./request.http) for IntelliJ IDEA's built-in HTTP Client. It contains ready-to-run requests for token creation, telemetry ingestion, anomaly scenarios, validation failures, and dashboard reads.
+
 Request a vehicle token:
 
 ```bash
