@@ -1,0 +1,283 @@
+### Fleet Telemetry Monitoring Service - IntelliJ HTTP Client
+### Start the stack first:
+###   docker compose up -d postgres backend frontend
+###
+### Notes:
+### - Run "Create vehicle token" before telemetry requests. It stores {{vehicleToken}} globally.
+### - If token creation returns 409, that vehicle already has an unexpired active session.
+###   Use another vehicle, wait for expiry, or mark the session inactive in Postgres for local testing.
+
+@baseUrl = http://localhost:8000
+@vehicleId = v-12
+@otherVehicleId = v-13
+@now = {{$isoTimestamp}}
+
+### Health
+GET {{baseUrl}}/health
+
+### Fleet state
+GET {{baseUrl}}/fleet/state
+
+### All vehicles
+GET {{baseUrl}}/vehicles
+
+### Zone counts
+GET {{baseUrl}}/zones/counts
+
+### Recent anomalies
+GET {{baseUrl}}/anomalies?limit=25
+
+### Recent warnings
+GET {{baseUrl}}/warnings?limit=25
+
+### Anomalies for one vehicle
+GET {{baseUrl}}/anomalies?vehicle_id={{vehicleId}}&limit=25
+
+### Warnings for one vehicle
+GET {{baseUrl}}/warnings?vehicle_id={{vehicleId}}&limit=25
+
+### Create vehicle token
+POST {{baseUrl}}/auth/vehicle-token
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}"
+}
+
+> {%
+  client.global.set("vehicleToken", response.body.token);
+  client.global.set("vehicleTokenExpiresAt", response.body.expires_at);
+%}
+
+### Valid telemetry with zone entry
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:00Z",
+  "lat": 37.4100,
+  "lon": -122.0800,
+  "battery_pct": 78,
+  "speed_mps": 1.2,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": "pack_station"
+}
+
+### Low battery warning, not anomaly
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:05Z",
+  "lat": 37.4101,
+  "lon": -122.0801,
+  "battery_pct": 12,
+  "speed_mps": 1.1,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### STATUS_SPEED_CONFLICT anomaly
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:10Z",
+  "lat": 37.4102,
+  "lon": -122.0802,
+  "battery_pct": 70,
+  "speed_mps": 1.4,
+  "status": "idle",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### GPS_JUMP anomaly
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:15Z",
+  "lat": 37.4300,
+  "lon": -122.0600,
+  "battery_pct": 69,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### BATTERY_DRAIN_SPIKE anomaly
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:00:30Z",
+  "lat": 37.4301,
+  "lon": -122.0601,
+  "battery_pct": 50,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### REPEATED_FAULT_CODES 1/3
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:01:00Z",
+  "lat": 37.4302,
+  "lon": -122.0602,
+  "battery_pct": 49,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": ["E_DRIVE"],
+  "zone_entered": null
+}
+
+### REPEATED_FAULT_CODES 2/3
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:01:20Z",
+  "lat": 37.4303,
+  "lon": -122.0603,
+  "battery_pct": 48,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": ["E_DRIVE"],
+  "zone_entered": null
+}
+
+### REPEATED_FAULT_CODES 3/3 - anomaly should be detected here
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:01:40Z",
+  "lat": 37.4304,
+  "lon": -122.0604,
+  "battery_pct": 47,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": ["E_DRIVE"],
+  "zone_entered": null
+}
+
+### Fault transition
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:02:00Z",
+  "lat": 37.4305,
+  "lon": -122.0605,
+  "battery_pct": 45,
+  "speed_mps": 0,
+  "status": "fault",
+  "error_codes": ["F_MOTOR"],
+  "zone_entered": "maintenance_bay"
+}
+
+### Out-of-order telemetry persists but should not overwrite current state
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-23T23:59:00Z",
+  "lat": 37.4000,
+  "lon": -122.0900,
+  "battery_pct": 99,
+  "speed_mps": 0,
+  "status": "idle",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### Invalid telemetry validation example
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:03:00Z",
+  "lat": 91,
+  "lon": -122.08,
+  "battery_pct": 101,
+  "speed_mps": -1,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### Create token for another vehicle
+POST {{baseUrl}}/auth/vehicle-token
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{otherVehicleId}}"
+}
+
+> {%
+  client.global.set("otherVehicleToken", response.body.token);
+%}
+
+### Token vehicle_id mismatch rejection - should return 403
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{otherVehicleId}}",
+  "timestamp": "2026-05-24T00:04:00Z",
+  "lat": 37.41,
+  "lon": -122.08,
+  "battery_pct": 80,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": null
+}
+
+### Unknown zone validation - should return 422
+POST {{baseUrl}}/telemetry
+Authorization: Bearer {{vehicleToken}}
+Content-Type: application/json
+
+{
+  "vehicle_id": "{{vehicleId}}",
+  "timestamp": "2026-05-24T00:05:00Z",
+  "lat": 37.41,
+  "lon": -122.08,
+  "battery_pct": 80,
+  "speed_mps": 1.0,
+  "status": "moving",
+  "error_codes": [],
+  "zone_entered": "unknown_zone"
+}
