@@ -1,6 +1,6 @@
 # Fleet Telemetry Monitoring Service
 
-Fullstack take-home implementation for monitoring a 50-vehicle fleet. The service ingests authenticated vehicle telemetry, persists every valid event, updates current fleet state transactionally, detects deterministic anomalies, tracks low-battery warnings separately, and exposes a polling dashboard.
+Fullstack Project implementation for monitoring a 50-vehicle fleet. The service ingests authenticated vehicle telemetry, persists every valid event, updates current fleet state transactionally, detects deterministic anomalies, tracks low-battery warnings separately, and exposes a polling dashboard.
 
 ## Architecture Summary
 
@@ -12,8 +12,6 @@ Fullstack take-home implementation for monitoring a 50-vehicle fleet. The servic
 - Vehicle authentication: `POST /auth/vehicle-token` issues 1-hour JWTs for existing vehicles without an unexpired active session.
 - Telemetry ingestion: authenticated `POST /telemetry`, row-level vehicle locking, authoritative event persistence, synchronous anomaly detection, atomic zone increments, and out-of-order protection for current vehicle state.
 - Domain events: lightweight in-process publisher/subscriber. Events are accumulated inside the transaction and published only after a successful commit. A subscriber writes `domain_event_logs`.
-
-Queue-based ingestion is the future scale path: put authenticated telemetry onto a durable queue, let workers perform the same transactional ingestion, and keep the dashboard reading derived state from Postgres or a read model.
 
 ## Docker Compose Setup
 
