@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Box, Button, Input, Select, Table, Text, Title } from 'rizzui';
 import { RotateCw } from 'lucide-react';
 import {
@@ -72,7 +72,10 @@ function fmtTime(value: string | null): string {
 
 function humanize(value: string | null | undefined): string {
   if (!value) return '-';
-  return value.replace(/_/g, ' ');
+  return value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function selectValue(value: unknown): string {
@@ -82,23 +85,96 @@ function selectValue(value: unknown): string {
   return 'all';
 }
 
+function zoneLabel(value: string): string {
+  return humanize(value).replace('Dock', 'Dk').replace('Charging Bay', 'Charge');
+}
+
 function MetricCard({
   label,
   value,
+  detail,
   tone,
 }: {
   label: string;
   value: number | string;
+  detail: string;
   tone?: 'neutral' | 'teal' | 'rose' | 'amber' | 'indigo';
 }) {
   return (
     <Box className={`metric-card tone-${tone ?? 'neutral'}`}>
-      <Text className="metric-label">{label}</Text>
-      <Title as="h3" className="metric-value">
-        {value}
-      </Title>
+      <div>
+        <Text className="metric-label">{label}</Text>
+        <Title as="h3" className="metric-value">
+          {value}
+        </Title>
+      </div>
+      <Text className="metric-detail">{detail}</Text>
     </Box>
   );
+}
+
+function ChartPanel({
+  title,
+  detail,
+  className,
+  children,
+}: {
+  title: string;
+  detail: string;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <Box className={`panel chart-panel ${className}`}>
+      <div className="panel-head">
+        <div>
+          <Title as="h2" className="panel-title">
+            {title}
+          </Title>
+          <Text className="panel-detail">{detail}</Text>
+        </div>
+      </div>
+      <div className="chart-body">{children}</div>
+    </Box>
+  );
+}
+
+function DomainBadge({
+  value,
+  tone,
+}: {
+  value: string | null | undefined;
+  tone: 'status' | 'freshness' | 'anomaly' | 'warning';
+}) {
+  if (!value) return <span className="muted-value">-</span>;
+  return (
+    <Badge
+      rounded="pill"
+      size="sm"
+      variant="flat"
+      color={badgeColors[value] ?? (tone === 'warning' ? 'warning' : tone === 'anomaly' ? 'danger' : 'secondary')}
+      className={`domain-badge ${tone}-${value.toLowerCase()}`}
+    >
+      {humanize(value)}
+    </Badge>
+  );
+}
+
+function BatteryCell({ value }: { value: number | null }) {
+  if (value === null) return <span className="muted-value">-</span>;
+  const tone = value < 15 ? 'danger' : value < 35 ? 'warning' : 'healthy';
+  return (
+    <div className="battery-cell">
+      <span>{value}%</span>
+      <span className="battery-track" aria-hidden="true">
+        <span className={`battery-fill battery-${tone}`} style={{ width: `${value}%` }} />
+      </span>
+    </div>
+  );
+}
+
+function freshnessChartValue(vehicles: VehicleState[], target: Freshness): number {
+  return vehicles.filter((vehicle) => vehicle.freshness === target).length;
 }
 
 function App() {
@@ -149,14 +225,20 @@ function App() {
     });
   }, [data.vehicles, freshnessFilter, query, statusFilter]);
 
-  const statusChart = Object.entries(data.fleetState).map(([name, value]) => ({ name, value }));
+  const staleCount = freshnessChartValue(data.vehicles, 'stale');
+  const freshCount = freshnessChartValue(data.vehicles, 'fresh');
+  const statusChart = Object.entries(data.fleetState).map(([name, value]) => ({
+    name,
+    label: humanize(name),
+    value,
+  }));
   const anomalyChart = Object.entries(
     data.anomalies.reduce<Record<string, number>>((acc, anomaly) => {
       acc[anomaly.type] = (acc[anomaly.type] ?? 0) + 1;
       return acc;
     }, {}),
   )
-    .map(([name, value]) => ({ name, value }))
+    .map(([name, value]) => ({ name, label: humanize(name), value }))
     .sort((a, b) => b.value - a.value);
   const freshnessChart = Object.entries(
     data.vehicles.reduce<Record<Freshness, number>>(
@@ -166,8 +248,11 @@ function App() {
       },
       { fresh: 0, stale: 0, never_seen: 0 },
     ),
-  ).map(([name, value]) => ({ name, value }));
-  const topZones = [...data.zoneCounts].sort((a, b) => b.entry_count - a.entry_count).slice(0, 10);
+  ).map(([name, value]) => ({ name, label: humanize(name), value }));
+  const topZones = [...data.zoneCounts]
+    .sort((a, b) => b.entry_count - a.entry_count)
+    .slice(0, 10)
+    .map((zone) => ({ ...zone, label: zoneLabel(zone.zone_id) }));
 
   return (
     <main className="app-shell">
@@ -193,20 +278,17 @@ function App() {
       ) : null}
 
       <section className="metrics-grid">
-        <MetricCard label="Moving" value={data.fleetState.moving} tone="teal" />
-        <MetricCard label="Faulted" value={data.fleetState.fault} tone="rose" />
-        <MetricCard label="Stale" value={freshnessChart.find((item) => item.name === 'stale')?.value ?? 0} tone="amber" />
-        <MetricCard label="Warnings" value={data.warnings.length} tone="indigo" />
+        <MetricCard label="Moving" value={data.fleetState.moving} detail="active vehicles" tone="teal" />
+        <MetricCard label="Faulted" value={data.fleetState.fault} detail="needs maintenance" tone="rose" />
+        <MetricCard label="Stale" value={staleCount} detail={`${freshCount} reporting fresh`} tone="amber" />
+        <MetricCard label="Warnings" value={data.warnings.length} detail="latest 100 window" tone="indigo" />
       </section>
 
       <section className="chart-grid">
-        <Box className="panel">
-          <Title as="h2" className="panel-title">
-            Fleet Status
-          </Title>
-          <ResponsiveContainer width="100%" height={230}>
+        <ChartPanel title="Fleet Status" detail="Current state distribution" className="status-panel">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={statusChart} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88}>
+              <Pie data={statusChart} dataKey="value" nameKey="label" innerRadius={62} outerRadius={92}>
                 {statusChart.map((entry) => (
                   <Cell key={entry.name} fill={statusColors[entry.name]} />
                 ))}
@@ -215,45 +297,36 @@ function App() {
               <Legend />
             </PieChart>
           </ResponsiveContainer>
-        </Box>
+        </ChartPanel>
 
-        <Box className="panel">
-          <Title as="h2" className="panel-title">
-            Zone Entries
-          </Title>
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={topZones}>
+        <ChartPanel title="Zone Entries" detail="Top zones by edge-reported entry count" className="zone-panel">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={topZones} margin={{ top: 8, right: 12, bottom: 40, left: 4 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="zone_id" tick={{ fontSize: 11 }} interval={0} angle={-22} textAnchor="end" height={64} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-28} textAnchor="end" height={70} />
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Bar dataKey="entry_count" fill="#0f766e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </Box>
+        </ChartPanel>
 
-        <Box className="panel">
-          <Title as="h2" className="panel-title">
-            Anomalies
-          </Title>
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={anomalyChart} layout="vertical" margin={{ left: 36 }}>
+        <ChartPanel title="Anomalies" detail="Recent anomaly count by type" className="anomaly-panel">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={anomalyChart} layout="vertical" margin={{ top: 8, right: 16, bottom: 8, left: 72 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
               <XAxis type="number" allowDecimals={false} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={112} />
+              <YAxis dataKey="label" type="category" tick={{ fontSize: 11 }} width={150} />
               <Tooltip />
               <Bar dataKey="value" fill="#be123c" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </Box>
+        </ChartPanel>
 
-        <Box className="panel">
-          <Title as="h2" className="panel-title">
-            Freshness
-          </Title>
-          <ResponsiveContainer width="100%" height={230}>
+        <ChartPanel title="Freshness" detail="Telemetry freshness across fleet" className="freshness-panel">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={freshnessChart} dataKey="value" nameKey="name" outerRadius={88}>
+              <Pie data={freshnessChart} dataKey="value" nameKey="label" outerRadius={90}>
                 {freshnessChart.map((entry) => (
                   <Cell key={entry.name} fill={freshnessColors[entry.name]} />
                 ))}
@@ -262,7 +335,7 @@ function App() {
               <Legend />
             </PieChart>
           </ResponsiveContainer>
-        </Box>
+        </ChartPanel>
       </section>
 
       <Box className="panel vehicle-panel">
@@ -274,17 +347,26 @@ function App() {
             <Text className="subtle">{filteredVehicles.length} of {data.vehicles.length} vehicles</Text>
           </div>
           <div className="filters">
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search vehicles" />
-            <Select
-              value={statusOptions.find((option) => option.value === statusFilter)}
-              onChange={(option: unknown) => setStatusFilter(selectValue(option))}
-              options={statusOptions}
-            />
-            <Select
-              value={freshnessOptions.find((option) => option.value === freshnessFilter)}
-              onChange={(option: unknown) => setFreshnessFilter(selectValue(option))}
-              options={freshnessOptions}
-            />
+            <div className="filter-field">
+              <Text className="filter-label">Search</Text>
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Vehicle or signal" />
+            </div>
+            <div className="filter-field">
+              <Text className="filter-label">Status</Text>
+              <Select
+                value={statusOptions.find((option) => option.value === statusFilter)}
+                onChange={(option: unknown) => setStatusFilter(selectValue(option))}
+                options={statusOptions}
+              />
+            </div>
+            <div className="filter-field">
+              <Text className="filter-label">Freshness</Text>
+              <Select
+                value={freshnessOptions.find((option) => option.value === freshnessFilter)}
+                onChange={(option: unknown) => setFreshnessFilter(selectValue(option))}
+                options={freshnessOptions}
+              />
+            </div>
           </div>
         </div>
 
@@ -307,15 +389,21 @@ function App() {
                 <Table.Row key={vehicle.vehicle_id}>
                   <Table.Cell className="mono">{vehicle.vehicle_id}</Table.Cell>
                   <Table.Cell>
-                    <Badge color={badgeColors[vehicle.status]}>{humanize(vehicle.status)}</Badge>
+                    <DomainBadge value={vehicle.status} tone="status" />
                   </Table.Cell>
-                  <Table.Cell>{vehicle.battery_pct ?? '-'}%</Table.Cell>
+                  <Table.Cell>
+                    <BatteryCell value={vehicle.battery_pct} />
+                  </Table.Cell>
                   <Table.Cell>{vehicle.speed_mps?.toFixed(1) ?? '-'} m/s</Table.Cell>
                   <Table.Cell>{fmtTime(vehicle.latest_timestamp)}</Table.Cell>
-                  <Table.Cell>{humanize(vehicle.latest_anomaly?.type)}</Table.Cell>
-                  <Table.Cell>{humanize(vehicle.latest_warning?.type)}</Table.Cell>
                   <Table.Cell>
-                    <Badge color={badgeColors[vehicle.freshness]}>{humanize(vehicle.freshness)}</Badge>
+                    <DomainBadge value={vehicle.latest_anomaly?.type} tone="anomaly" />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <DomainBadge value={vehicle.latest_warning?.type} tone="warning" />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <DomainBadge value={vehicle.freshness} tone="freshness" />
                   </Table.Cell>
                 </Table.Row>
               ))}

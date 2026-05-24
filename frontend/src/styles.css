@@ -29,9 +29,9 @@ select {
 }
 
 .app-shell {
-  width: min(1440px, 100%);
+  width: min(1720px, 100%);
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 32px 40px;
 }
 
 .topbar,
@@ -80,8 +80,8 @@ select {
 .metrics-grid,
 .chart-grid {
   display: grid;
-  gap: 16px;
-  margin-top: 20px;
+  gap: 18px;
+  margin-top: 22px;
 }
 
 .metrics-grid {
@@ -89,7 +89,7 @@ select {
 }
 
 .chart-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
 .metric-card,
@@ -100,6 +100,14 @@ select {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
+.metric-card {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px 18px 16px;
+}
+
 .metric-label {
   color: #667085;
   font-size: 0.78rem;
@@ -108,9 +116,20 @@ select {
 }
 
 .metric-value {
-  margin-top: 8px;
-  font-size: 1.9rem;
+  margin-top: 10px;
+  font-size: 2.05rem;
   line-height: 1;
+}
+
+.metric-detail,
+.panel-detail,
+.filter-label {
+  color: #667085;
+  font-size: 0.78rem;
+}
+
+.metric-detail {
+  margin-top: 12px;
 }
 
 .tone-teal {
@@ -130,29 +149,78 @@ select {
 }
 
 .panel-title {
-  margin-bottom: 12px;
+  margin-bottom: 2px;
   font-size: 1rem;
   line-height: 1.25;
 }
 
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-panel {
+  min-height: 334px;
+  padding: 18px 18px 14px;
+}
+
+.chart-body {
+  height: 260px;
+  margin-top: 14px;
+}
+
+.status-panel,
+.freshness-panel {
+  grid-column: span 4;
+}
+
+.zone-panel,
+.anomaly-panel {
+  grid-column: span 8;
+}
+
 .vehicle-panel {
-  margin-top: 20px;
+  margin-top: 22px;
+  padding: 18px;
+}
+
+.vehicle-panel-head {
+  align-items: flex-end;
+  margin-bottom: 16px;
 }
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) 160px 180px;
-  gap: 10px;
+  grid-template-columns: minmax(220px, 320px) 180px 190px;
+  gap: 12px;
   align-items: center;
+}
+
+.filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.filter-label {
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .table-wrap {
   width: 100%;
+  max-height: 620px;
   overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #e5e9f0;
+  border-radius: 8px;
 }
 
 .vehicle-table {
-  min-width: 980px;
+  min-width: 1120px;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .vehicle-table th,
@@ -160,15 +228,90 @@ select {
   white-space: nowrap;
 }
 
+.vehicle-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 14px;
+  background: #f3f5f8;
+  color: #667085;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vehicle-table td {
+  padding: 14px;
+  border-top: 1px solid #edf0f5;
+  vertical-align: middle;
+}
+
+.vehicle-table tbody tr:hover td {
+  background: #f9fafb;
+}
+
 .mono {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-weight: 700;
 }
 
+.domain-badge {
+  max-width: 180px;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muted-value {
+  color: #98a2b3;
+}
+
+.battery-cell {
+  display: grid;
+  width: 132px;
+  gap: 6px;
+}
+
+.battery-track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e7ebf1;
+}
+
+.battery-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.battery-healthy {
+  background: #0f766e;
+}
+
+.battery-warning {
+  background: #b7791f;
+}
+
+.battery-danger {
+  background: #be123c;
+}
+
 @media (max-width: 1180px) {
-  .metrics-grid,
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .chart-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-panel,
+  .freshness-panel,
+  .zone-panel,
+  .anomaly-panel {
+    grid-column: span 1;
   }
 }
 
@@ -186,6 +329,14 @@ select {
   .metrics-grid,
   .chart-grid {
     grid-template-columns: 1fr;
+  }
+
+  .chart-panel {
+    min-height: 360px;
+  }
+
+  .chart-body {
+    height: 280px;
   }
 
   .filters {
